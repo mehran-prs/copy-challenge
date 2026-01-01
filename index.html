@@ -3,71 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pen-Only Matcher</title>
+    <title>Natural Ink Matcher - Themes</title>
     <style>
+        /* --- Theme Variables --- */
+        :root {
+            --bg-color: #ffffff;
+            --toolbar-bg: #ffffff;
+            --toolbar-border: #dddddd;
+            --text-color: #333333;
+            --button-bg: #f0f0f0;
+            --ref-bg: #ffffff;
+            --ref-border: #333333;
+            --ink-color: #007bff;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #1a1a1a;
+            --toolbar-bg: #2d2d2d;
+            --toolbar-border: #444444;
+            --text-color: #eeeeee;
+            --button-bg: #444444;
+            --ref-bg: #2d2d2d;
+            --ref-border: #666666;
+            --ink-color: #4dabff;
+        }
+
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
-            overflow: hidden; font-family: -apple-system, sans-serif;
-            background: #fff; touch-action: none;
+            overflow: hidden; background: var(--bg-color); touch-action: none;
+            font-family: -apple-system, sans-serif; transition: background 0.3s ease;
         }
 
-        /* Minimalist Toolbar */
         .toolbar {
             position: fixed; top: 0; left: 0; width: 100%; height: 50px;
-            background: rgba(255, 255, 255, 0.9); border-bottom: 1px solid #eee;
-            display: flex; align-items: center; justify-content: center; gap: 20px;
-            z-index: 1000;
+            background: var(--toolbar-bg); border-bottom: 1px solid var(--toolbar-border);
+            display: flex; align-items: center; justify-content: center; gap: 12px;
+            z-index: 1000; color: var(--text-color);
         }
 
-        #drawCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; }
+        #drawCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
 
-        /* Floating Reference */
         #floatingRef {
-            position: absolute; top: 65px; right: 15px;
-            width: 130px; background: white; border: 1.5px solid #000;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-radius: 4px; z-index: 2000;
+            position: absolute; top: 60px; right: 15px;
+            width: 140px; border: 2px solid var(--ref-border); background: var(--ref-bg);
+            z-index: 2000; border-radius: 6px; overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-        #refHeader {
-            height: 18px; background: #000; color: #fff; font-size: 9px;
-            display: flex; align-items: center; justify-content: center;
-            cursor: move; text-transform: uppercase;
-        }
-        #refCanvas { display: block; background: #fff; width: 100%; }
+        #refHeader { height: 20px; background: var(--ref-border); color: #fff; font-size: 10px; text-align: center; line-height: 20px; cursor: move; }
+        #refCanvas { display: block; width: 100%; background: var(--ref-bg); }
 
         /* UI Styling */
-        .input-wrap { display: flex; align-items: center; gap: 8px; border-right: 1px solid #eee; padding-right: 15px; }
-        input[type="number"] { width: 35px; border: 1px solid #ddd; border-radius: 4px; padding: 4px; font-size: 14px; }
-        button {
-            padding: 8px 20px; font-size: 13px; font-weight: 600; border-radius: 20px;
-            border: none; cursor: pointer; transition: all 0.2s;
-        }
-        .btn-new { background: #f0f0f0; color: #333; }
+        input[type="number"] { width: 32px; border: 1px solid var(--toolbar-border); background: var(--button-bg); color: var(--text-color); border-radius: 4px; padding: 5px; text-align: center; }
+        button { padding: 6px 14px; font-weight: bold; border-radius: 20px; border: none; cursor: pointer; background: var(--button-bg); color: var(--text-color); }
         .btn-match { background: #007bff; color: white; }
-        #scoreDisplay { font-weight: bold; color: #007bff; font-size: 18px; min-width: 50px; }
-
-        /* Pen-only indicator */
-        .mode-hint { position: fixed; bottom: 10px; right: 10px; font-size: 10px; color: #ccc; z-index: 50; }
+        .theme-toggle { font-size: 18px; padding: 4px 8px; background: transparent; }
     </style>
 </head>
 <body>
 
 <div class="toolbar">
-    <div class="input-wrap">
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
+    <div style="display:flex; align-items:center; gap:8px;">
         <input type="number" id="lineCount" value="3" min="1" max="10">
-        <button class="btn-new" onclick="startNewGame()">NEW</button>
+        <input type="checkbox" id="allowCurves"> <label for="allowCurves" style="font-size:12px; font-weight:bold;">Curves</label>
     </div>
-    <button class="btn-match" onclick="checkMatch()">MATCH</button>
-    <div id="scoreDisplay">--%</div>
+    <button class="btn-new" onclick="startNewGame()">NEW</button>
+    <button class="btn-match" onclick="showMatch()">MATCH</button>
 </div>
 
 <canvas id="drawCanvas"></canvas>
 
 <div id="floatingRef">
-    <div id="refHeader">Move Window</div>
+    <div id="refHeader">REF</div>
     <canvas id="refCanvas"></canvas>
 </div>
-
-<div class="mode-hint">Pen Input Only</div>
 
 <script>
     const drawCanvas = document.getElementById('drawCanvas');
@@ -77,140 +86,146 @@
     const floatingRef = document.getElementById('floatingRef');
 
     let targetLines = [];
-    let userLines = [];
     let isDrawing = false;
-    let startPos = { x: 0, y: 0 };
+    let points = [];
 
+    // --- Theme Logic ---
+    function initTheme() {
+        const savedTheme = localStorage.getItem('user-theme');
+        if (savedTheme) {
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    }
+
+    function toggleTheme() {
+        const current = document.documentElement.getAttribute('data-theme');
+        const target = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', target);
+        localStorage.setItem('user-theme', target);
+        // Refresh canvases to match new theme colors
+        startNewGame();
+    }
+
+    initTheme();
+
+    // --- Drawing Logic ---
     function syncLayout() {
+        const temp = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
         drawCanvas.width = window.innerWidth;
         drawCanvas.height = window.innerHeight;
-        const screenRatio = window.innerHeight / window.innerWidth;
-        const refWidth = 130;
-        refCanvas.width = refWidth;
-        refCanvas.height = refWidth * screenRatio;
+        drawCtx.putImageData(temp, 0, 0);
+        refCanvas.width = 140;
+        refCanvas.height = 140 * (window.innerHeight / window.innerWidth);
     }
 
-    window.addEventListener('resize', () => {
-        syncLayout();
-        renderUserLines();
-    });
+    window.addEventListener('resize', syncLayout);
+    syncLayout();
 
-    // REJECTION LOGIC: Check if the pointer is a pen
-    function isPen(e) {
-        // pointerType can be 'mouse', 'pen', or 'touch'
-        return e.pointerType === 'pen';
-    }
+    function isPen(e) { return e.pointerType === 'pen'; }
 
-    function getPos(e) {
-        const rect = drawCanvas.getBoundingClientRect();
-        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    }
-
-    // --- Dragging Window (Allows touch/mouse so you can move it) ---
-    let isDraggingRef = false;
-    let dragOffset = { x: 0, y: 0 };
-
-    floatingRef.onpointerdown = (e) => {
-        isDraggingRef = true;
-        dragOffset.x = e.clientX - floatingRef.offsetLeft;
-        dragOffset.y = e.clientY - floatingRef.offsetTop;
-        floatingRef.setPointerCapture(e.pointerId);
-        e.stopPropagation();
-    };
-    floatingRef.onpointermove = (e) => {
-        if (!isDraggingRef) return;
-        floatingRef.style.left = (e.clientX - dragOffset.x) + 'px';
-        floatingRef.style.top = (e.clientY - dragOffset.y) + 'px';
-        floatingRef.style.right = 'auto';
-    };
-    floatingRef.onpointerup = () => isDraggingRef = false;
-
-    // --- Drawing Logic (STRICT PEN ONLY) ---
     drawCanvas.onpointerdown = (e) => {
-        if (!isPen(e) || isDraggingRef) return;
+        if (!isPen(e)) return;
         isDrawing = true;
-        startPos = getPos(e);
+        points = [{ x: e.clientX, y: e.clientY }];
+
+        const theme = document.documentElement.getAttribute('data-theme');
+        drawCtx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink-color').trim();
+        drawCtx.lineWidth = 3;
+        drawCtx.lineCap = 'round';
+        drawCtx.lineJoin = 'round';
+        drawCanvas.setPointerCapture(e.pointerId);
     };
 
     drawCanvas.onpointermove = (e) => {
         if (!isDrawing || !isPen(e)) return;
-        renderUserLines();
-        drawSingleLine(drawCtx, {x1: startPos.x, y1: startPos.y, x2: getPos(e).x, y2: getPos(e).y}, '#007bff', 2.5);
+        points.push({ x: e.clientX, y: e.clientY });
+        if (points.length > 2) {
+            const lastTwoPoints = points.slice(-3);
+            const xc = (lastTwoPoints[1].x + lastTwoPoints[2].x) / 2;
+            const yc = (lastTwoPoints[1].y + lastTwoPoints[2].y) / 2;
+            drawCtx.beginPath();
+            drawCtx.moveTo(lastTwoPoints[0].x, lastTwoPoints[0].y);
+            drawCtx.quadraticCurveTo(lastTwoPoints[1].x, lastTwoPoints[1].y, xc, yc);
+            drawCtx.stroke();
+            lastTwoPoints[0].x = xc; lastTwoPoints[0].y = yc;
+        }
     };
 
-    drawCanvas.onpointerup = (e) => {
-        if (!isDrawing || !isPen(e)) return;
-        const endPos = getPos(e);
-        userLines.push({ x1: startPos.x, y1: startPos.y, x2: endPos.x, y2: endPos.y });
-        isDrawing = false;
-        renderUserLines();
-    };
+    drawCanvas.onpointerup = () => { isDrawing = false; points = []; };
 
-    function drawSingleLine(ctx, line, color, width, dash = []) {
+    // --- Core Matcher Logic ---
+    function renderLine(ctx, p, color, width, dash = []) {
         ctx.beginPath();
         ctx.setLineDash(dash);
-        ctx.moveTo(line.x1, line.y1);
-        ctx.lineTo(line.x2, line.y2);
         ctx.strokeStyle = color;
         ctx.lineWidth = width;
         ctx.lineCap = 'round';
+        ctx.moveTo(p.x1, p.y1);
+        if (p.type === 'curve') ctx.quadraticCurveTo(p.cx, p.cy, p.x2, p.y2);
+        else ctx.lineTo(p.x2, p.y2);
         ctx.stroke();
         ctx.setLineDash([]);
     }
 
-    function renderUserLines() {
-        drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-        userLines.forEach(l => drawSingleLine(drawCtx, l, '#007bff', 2.5));
-    }
-
-    // --- Game Logic ---
     function startNewGame() {
-        userLines = [];
         targetLines = [];
-        document.getElementById('scoreDisplay').innerText = '--%';
         drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
         refCtx.clearRect(0, 0, refCanvas.width, refCanvas.height);
-
         syncLayout();
 
         const n = document.getElementById('lineCount').value;
+        const allowCurves = document.getElementById('allowCurves').checked;
+        const theme = document.documentElement.getAttribute('data-theme');
+        const refInk = theme === 'dark' ? '#eeeeee' : '#333333';
+
         for (let i = 0; i < n; i++) {
-            const line = {
+            const isCurve = allowCurves && Math.random() > 0.5;
+            const p = {
+                type: isCurve ? 'curve' : 'line',
                 x1: Math.random() * (refCanvas.width - 20) + 10,
                 y1: Math.random() * (refCanvas.height - 20) + 10,
                 x2: Math.random() * (refCanvas.width - 20) + 10,
-                y2: Math.random() * (refCanvas.height - 20) + 10
+                y2: Math.random() * (refCanvas.height - 20) + 10,
+                cx: Math.random() * refCanvas.width,
+                cy: Math.random() * refCanvas.height
             };
-            targetLines.push(line);
-            drawSingleLine(refCtx, line, '#333', 1.5);
+            targetLines.push(p);
+            renderLine(refCtx, p, refInk, 1.5);
         }
     }
 
-    function checkMatch() {
-        if (userLines.length === 0) return;
+    function showMatch() {
         const ratio = drawCanvas.width / refCanvas.width;
-        let totalScore = 0;
-
         targetLines.forEach(t => {
-            const scaled = { x1: t.x1 * ratio, y1: t.y1 * ratio, x2: t.x2 * ratio, y2: t.y2 * ratio };
-            drawSingleLine(drawCtx, scaled, 'rgba(255, 0, 0, 0.3)', 5, [10, 8]);
-
-            let bestMatch = 0;
-            userLines.forEach(u => {
-                const d1 = Math.hypot(scaled.x1 - u.x1, scaled.y1 - u.y1) + Math.hypot(scaled.x2 - u.x2, scaled.y2 - u.y2);
-                const d2 = Math.hypot(scaled.x1 - u.x2, scaled.y1 - u.y2) + Math.hypot(scaled.x2 - u.x1, scaled.y2 - u.y1);
-                const score = Math.max(0, 100 - (Math.min(d1, d2) / 25));
-                if (score > bestMatch) bestMatch = score;
-            });
-            totalScore += bestMatch;
+            const scaled = {
+                type: t.type,
+                x1: t.x1 * ratio, y1: t.y1 * ratio,
+                x2: t.x2 * ratio, y2: t.y2 * ratio,
+                cx: t.cx * ratio, cy: t.cy * ratio
+            };
+            renderLine(drawCtx, scaled, 'rgba(255, 69, 58, 0.5)', 5, [10, 5]);
         });
-
-        document.getElementById('scoreDisplay').innerText = `${Math.round(totalScore / targetLines.length)}%`;
     }
 
-    syncLayout();
-    setTimeout(startNewGame, 100);
+    // Draggable Window
+    let isDrag = false, offset = {x:0, y:0};
+    floatingRef.onpointerdown = (e) => {
+        isDrag = true; offset.x = e.clientX - floatingRef.offsetLeft;
+        offset.y = e.clientY - floatingRef.offsetTop;
+        floatingRef.setPointerCapture(e.pointerId); e.stopPropagation();
+    };
+    floatingRef.onpointermove = (e) => {
+        if (isDrag) {
+            floatingRef.style.left = (e.clientX - offset.x) + 'px';
+            floatingRef.style.top = (e.clientY - offset.y) + 'px';
+            floatingRef.style.right = 'auto';
+        }
+    };
+    floatingRef.onpointerup = () => isDrag = false;
 
+    startNewGame();
 </script>
 </body>
 </html>
