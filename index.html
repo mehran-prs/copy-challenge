@@ -58,7 +58,7 @@
             position: absolute; top: 60px; right: 15px;
             width: 140px; border: 2px solid var(--ref-border); background: var(--ref-bg);
             z-index: 2000; border-radius: 6px; overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); cursor: move;
         }
         #refHeader { height: 20px; background: var(--ref-border); color: #fff; font-size: 10px; line-height: 20px; cursor: move; display: flex; align-items: center; justify-content: space-between; padding: 0 4px; }
         #refHeader .title { flex: 1; text-align: center; }
@@ -375,23 +375,22 @@
         });
     }
 
-    // Draggable Ref Window
+    // Draggable Ref Window (can drag from header or body)
     let isDrag = false, offset = {x:0, y:0};
-    const refHeader = document.getElementById('refHeader');
-    refHeader.onpointerdown = (e) => {
+    floatingRef.onpointerdown = (e) => {
         if (e.target.classList.contains('icon-btn')) return;
         isDrag = true; offset.x = e.clientX - floatingRef.offsetLeft;
         offset.y = e.clientY - floatingRef.offsetTop;
-        refHeader.setPointerCapture(e.pointerId); e.stopPropagation();
+        floatingRef.setPointerCapture(e.pointerId); e.stopPropagation();
     };
-    refHeader.onpointermove = (e) => {
+    floatingRef.onpointermove = (e) => {
         if (isDrag) {
             floatingRef.style.left = (e.clientX - offset.x) + 'px';
             floatingRef.style.top = (e.clientY - offset.y) + 'px';
             floatingRef.style.right = 'auto';
         }
     };
-    refHeader.onpointerup = () => isDrag = false;
+    floatingRef.onpointerup = () => isDrag = false;
 
     // --- Initialization ---
     initTheme();
