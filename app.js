@@ -4,7 +4,12 @@ const drawCtx = drawCanvas.getContext('2d');
 const refCtx = refCanvas.getContext('2d');
 const floatingRef = document.getElementById('floatingRef');
 const countInput = document.getElementById('lineCount');
-const allowCurvesBtn = document.getElementById('allowCurves')
+
+
+const StorageKeyLineCount = "pm-line-count"
+const StorageKeyAllowCurves = "pm-allow-curves"
+const StorageKeyAllowTouch = "pm-allow-touch"
+const StorageKeyAllowHintLines = "pm-allow-hint-lines"
 
 let targetLines = [];
 let isDrawing = false;
@@ -20,20 +25,32 @@ let allowCurves;  // initializes on loadConfigs()
 // --- Persistent Configurations ---
 function loadConfigs() {
     // Load Line Count (Default to 3)
-    const savedCount = localStorage.getItem('pm-line-count');
+    const savedCount = localStorage.getItem(StorageKeyLineCount);
     countInput.value = savedCount !== null ? savedCount : 3;
 
     // Load Curves Preference
-    const savedCurves = localStorage.getItem('pm-allow-curves');
-    allowCurves = savedCurves === 'true';
-    allowCurvesBtn.classList.toggle('disabled', !allowCurves);
+    allowCurves = boolValFromStr(localStorage.getItem(StorageKeyAllowCurves));
+    allowTouch = boolValFromStr(localStorage.getItem(StorageKeyAllowTouch), true)
+    allowHintLines = boolValFromStr(localStorage.getItem(StorageKeyAllowHintLines), true)
+    syncConfigUI()
+}
+
+function boolValFromStr(val, def = false) {
+    return !val ? def : val === 'true';
 }
 
 function saveConfigs() {
-    localStorage.setItem('pm-line-count', countInput.value);
-    localStorage.setItem('pm-allow-curves', allowCurves);
+    localStorage.setItem(StorageKeyLineCount, countInput.value);
+    localStorage.setItem(StorageKeyAllowCurves, allowCurves);
+    localStorage.setItem(StorageKeyAllowTouch, allowTouch);
+    localStorage.setItem(StorageKeyAllowHintLines, allowHintLines);
+    syncConfigUI()
+}
 
-    allowCurvesBtn.classList.toggle('disabled', !allowCurves);
+function syncConfigUI() {
+    document.getElementById('allowCurves').classList.toggle('disabled', !allowCurves);
+    document.getElementById('touchToggle').classList.toggle('disabled', !allowTouch);
+    document.getElementById('hintLinesToggle').classList.toggle('disabled', !allowHintLines);
 }
 
 // --- Theme Logic ---
@@ -61,12 +78,12 @@ function toggleCurves() {
 
 function toggleTouch() {
     allowTouch = !allowTouch;
-    document.getElementById('touchToggle').classList.toggle('disabled', !allowTouch);
+    saveConfigs()
 }
 
 function toggleHintLines() {
     allowHintLines = !allowHintLines;
-    document.getElementById('hintLinesToggle').classList.toggle('disabled', !allowHintLines);
+    saveConfigs()
 }
 
 // --- Crosshair & Grid Toggles ---
